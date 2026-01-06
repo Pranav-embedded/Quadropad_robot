@@ -1,20 +1,20 @@
 
-#  🕷️ Quadruped Servo Robot – Arduino Nano Controlled
+#   Quadruped Servo Robot – Arduino Nano Controlled
 
 This project implements a **12-servo quadruped robot** using an **Arduino Nano** microcontroller. The robot features **realistic walking and movement patterns**, **Bluetooth control**
 
 ---
 
-## 🚀 Features
+##  Features
 
-- 🔄 **Basic Servo Initialization**: Positions all 12 servo motors to a neutral (90°) position.
-- 🤖 **Autonomous Motion Sequences**: Performs walking (forward/backward), turning (left/right), and dance routines with coordinated leg motion.
-- 📱 **Bluetooth Control**: Accepts commands (F, B, L, R, U, W, V) over Bluetooth to trigger movement.
-- 🧠 **Inverse Kinematics-Based Leg Control**: Each leg's endpoint is calculated and updated in real-time using a Cartesian-to-Polar transformation.
+-  **Basic Servo Initialization**: Positions all 12 servo motors to a neutral (90°) position.
+-  **Autonomous Motion Sequences**: Performs walking (forward/backward), turning (left/right), and dance routines with coordinated leg motion.
+-  **Bluetooth Control**: Accepts commands (F, B, L, R, U, W, V) over Bluetooth to trigger movement.
+-  **Inverse Kinematics-Based Leg Control**: Each leg's endpoint is calculated and updated in real-time using a Cartesian-to-Polar transformation.
 
 ---
 
-## 🎮 Bluetooth Command List
+##  Bluetooth Command List
 
 | Command | Action        |
 |---------|---------------|
@@ -28,7 +28,7 @@ This project implements a **12-servo quadruped robot** using an **Arduino Nano**
 
 ---
 
-## 🔧 Hardware Used
+##  Hardware Used
 
 - Arduino Nano
 - 12× SG90 (can use MG90S Servo Motors for more torque but power requirement will be more) 
@@ -39,7 +39,7 @@ This project implements a **12-servo quadruped robot** using an **Arduino Nano**
 
 ---
 
-## 📂 Code Structure
+##  Code Structure
 
 - `setup()`: Initializes servos, sets default positions, and starts the servo service.
 - `loop()`: Reads Bluetooth serial input and triggers appropriate movement functions.
@@ -48,7 +48,7 @@ This project implements a **12-servo quadruped robot** using an **Arduino Nano**
 
 ---
 
-## 🛠️ Getting Started
+##  Getting Started
 
 1. Upload the code to your Arduino using the Arduino IDE.
 2. Power the servo motors using a separate power supply.
@@ -59,7 +59,7 @@ This project implements a **12-servo quadruped robot** using an **Arduino Nano**
 
 ---
 
-## 📃 License
+##  License
 
 This project is open-source and available under the MIT License.
 
