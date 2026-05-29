@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32-CAM Control Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;500;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --panel: #0f1629;
+    --border: #1e3a5f;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #39ff14;
+    --text: #c8e0ff;
+    --dim: #4a6fa5;
+    --glow: 0 0 12px rgba(0,212,255,0.4);
+    --glow2: 0 0 12px rgba(255,107,53,0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow: hidden;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(0,80,160,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(0,212,255,0.05) 0%, transparent 50%);
+  }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 20px; background: var(--panel);
+    border-bottom: 1px solid var(--border); height: 48px;
+  }
+  .topbar .logo {
+    font-family: 'Share Tech Mono', monospace; font-size: 14px;
+    color: var(--accent); letter-spacing: 3px; text-transform: uppercase;
+    text-shadow: var(--glow);
+  }
+  .ip-config { display: flex; align-items: center; gap: 8px; }
+  .ip-config label { font-size: 11px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+  .ip-config input {
+    background: rgba(0,212,255,0.05); border: 1px solid var(--border);
+    color: var(--accent); font-family: 'Share Tech Mono', monospace;
+    font-size: 13px; padding: 4px 10px; border-radius: 4px; width: 160px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .ip-config input:focus { border-color: var(--accent); box-shadow: var(--glow); }
+  .connect-btn {
+    background: transparent; border: 1px solid var(--accent); color: var(--accent);
+    font-family: 'Share Tech Mono', monospace; font-size: 11px; padding: 4px 14px;
+    border-radius: 4px; cursor: pointer; letter-spacing: 2px; transition: all 0.2s;
+  }
+  .connect-btn:hover { background: rgba(0,212,255,0.1); box-shadow: var(--glow); }
+  .signal-log {
+    font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--accent3);
+    letter-spacing: 1px; min-width: 280px; text-align: right;
+    text-shadow: 0 0 8px rgba(57,255,20,0.5); overflow: hidden;
+    white-space: nowrap; text-overflow: ellipsis;
+  }
+  .status-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--dim); margin-right: 6px; vertical-align: middle; transition: all 0.3s;
+  }
+  .status-dot.connected { background: var(--accent3); box-shadow: 0 0 8px rgba(57,255,20,0.8); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .main {
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    grid-template-rows: auto 1fr;
+    height: calc(100vh - 48px);
+  }
+
+  .level-bar {
+    grid-column: 2; grid-row: 1;
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px; padding: 12px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  .level-btn {
+    position: relative; background: transparent; border: 1px solid var(--dim);
+    color: var(--dim); font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    letter-spacing: 3px; padding: 8px 28px; border-radius: 3px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.15s; overflow: hidden;
+  }
+  .level-btn::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 40%, rgba(255,107,53,0.1));
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .level-btn:hover, .level-btn.active {
+    border-color: var(--accent2); color: var(--accent2);
+    box-shadow: var(--glow2), inset 0 0 20px rgba(255,107,53,0.05);
+  }
+  .level-btn:hover::before, .level-btn.active::before { opacity: 1; }
+  .level-btn.active { background: rgba(255,107,53,0.08); }
+  .level-label { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--dim); letter-spacing: 2px; margin-right: 8px; }
+
+  .left-panel {
+    grid-column: 1; grid-row: 1 / 3;
+    background: var(--panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 24px; padding: 20px;
+  }
+  .panel-title {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 3px;
+    color: var(--dim); text-transform: uppercase;
+    border-bottom: 1px solid var(--border); padding-bottom: 8px;
+    width: 100%; text-align: center;
+  }
+  .joystick-container { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .joystick-ring {
+    position: relative; width: 180px; height: 180px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, rgba(0,212,255,0.03), transparent);
+    border: 1px solid var(--border);
+    box-shadow: 0 0 30px rgba(0,212,255,0.05), inset 0 0 30px rgba(0,0,0,0.5);
+  }
+  .joystick-crosshair { position: absolute; inset: 0; }
+  .joystick-crosshair::before {
+    content: ''; position: absolute; top: 50%; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    transform: translateY(-50%);
+  }
+  .joystick-crosshair::after {
+    content: ''; position: absolute; left: 50%; top: 10%; bottom: 10%; width: 1px;
+    background: linear-gradient(180deg, transparent, var(--border), transparent);
+    transform: translateX(-50%);
+  }
+  .dpad {
+    position: absolute; inset: 0;
+    display: grid;
+    grid-template-areas: ". up ." "left . right" ". down .";
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    padding: 20px; gap: 4px;
+  }
+  .dpad-btn {
+    background: rgba(0,212,255,0.04); border: 1px solid rgba(0,212,255,0.15);
+    color: var(--dim); border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; transition: all 0.1s; position: relative; overflow: hidden;
+    touch-action: manipulation;
+  }
+  .dpad-btn:hover { background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.4); color: var(--accent); }
+  .dpad-btn.flash { background: rgba(0,212,255,0.25); border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
+  .dpad-btn.up    { grid-area: up; }
+  .dpad-btn.down  { grid-area: down; }
+  .dpad-btn.left  { grid-area: left; }
+  .dpad-btn.right { grid-area: right; }
+  .btn-label {
+    position: absolute; bottom: 2px;
+    font-family: 'Share Tech Mono', monospace; font-size: 8px;
+    letter-spacing: 1px; color: var(--dim); opacity: 0.6;
+  }
+  .dpad-key-hints { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; }
+  .key-hint {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    border-radius: 3px; padding: 4px; text-align: center;
+    font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--dim);
+  }
+  .key-hint span { display: block; font-size: 10px; color: var(--accent); margin-bottom: 2px; }
+
+  /* Cooldown indicator under dpad */
+  .cooldown-bar {
+    width: 180px; height: 3px; background: rgba(255,255,255,0.05);
+    border-radius: 2px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .cooldown-fill {
+    height: 100%; width: 0%; background: var(--accent);
+    border-radius: 2px; transition: width 0.05s linear;
+    box-shadow: 0 0 6px rgba(0,212,255,0.6);
+  }
+  .cooldown-label {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--dim); letter-spacing: 2px; text-align: center;
+  }
+
+  .center-panel {
+    grid-column: 2; grid-row: 2;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 16px; gap: 16px;
+  }
+  .stream-wrapper {
+    position: relative; width: 100%; max-width: 640px; aspect-ratio: 4/3;
+    border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+    background: #000;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,212,255,0.05);
+  }
+  .stream-wrapper::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 80%, rgba(0,0,0,0.4));
+    z-index: 2; pointer-events: none;
+  }
+  .corner-tl,.corner-tr,.corner-bl,.corner-br {
+    position: absolute; width: 20px; height: 20px; z-index: 3; pointer-events: none;
+  }
+  .corner-tl { top:6px;left:6px;    border-top:2px solid var(--accent);border-left:2px solid var(--accent); }
+  .corner-tr { top:6px;right:6px;   border-top:2px solid var(--accent);border-right:2px solid var(--accent); }
+  .corner-bl { bottom:6px;left:6px; border-bottom:2px solid var(--accent);border-left:2px solid var(--accent); }
+  .corner-br { bottom:6px;right:6px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent); }
+  #stream-img { width:100%;height:100%;object-fit:cover;transform:rotate(180deg);display:block; }
+  .no-stream {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; z-index: 1;
+  }
+  .no-stream .scan-line {
+    width:60%;height:1px;
+    background:linear-gradient(90deg,transparent,var(--accent),transparent);
+    animation:scan 2s linear infinite;
+  }
+  @keyframes scan { 0%{transform:translateY(-60px);opacity:0} 20%{opacity:1} 80%{opacity:1} 100%{transform:translateY(60px);opacity:0} }
+  .no-stream p { font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);letter-spacing:2px; }
+
+  .active-signal-display {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--dim); text-align: center; letter-spacing: 1px; height: 16px;
+  }
+  .active-signal-display.firing { color: var(--accent3); text-shadow: 0 0 8px rgba(57,255,20,0.7); }
+
+  .right-panel {
+    grid-column: 3; grid-row: 1 / 3;
+    background: var(--panel); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 32px; padding: 24px 20px;
+  }
+  .slider-group { width:100%;display:flex;flex-direction:column;gap:12px; }
+  .slider-label { display:flex;justify-content:space-between;align-items:center; }
+  .slider-label .axis-name { font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase; }
+  .slider-label .axis-name.x { color:var(--accent); }
+  .slider-label .axis-name.y { color:var(--accent2); }
+  .slider-value { font-family:'Share Tech Mono',monospace;font-size:14px;font-weight:bold;min-width:40px;text-align:right; }
+  .slider-value.x { color:var(--accent);text-shadow:var(--glow); }
+  .slider-value.y { color:var(--accent2);text-shadow:var(--glow2); }
+  .slider-keys { display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);padding:0 2px; }
+  .slider-track { position:relative;width:100%;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;border:1px solid var(--border);overflow:visible; }
+  .slider-fill { position:absolute;left:0;top:0;height:100%;border-radius:3px;transition:width 0.05s; }
+  .slider-fill.x { background:linear-gradient(90deg,rgba(0,212,255,0.3),var(--accent)); }
+  .slider-fill.y { background:linear-gradient(90deg,rgba(255,107,53,0.3),var(--accent2)); }
+  .slider-thumb { position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid;transition:left 0.05s;box-shadow:0 0 8px currentColor; }
+  .slider-thumb.x { border-color:var(--accent);background:rgba(0,212,255,0.2); }
+  .slider-thumb.y { border-color:var(--accent2);background:rgba(255,107,53,0.2); }
+  .range-input { position:absolute;inset:-6px 0;opacity:0;cursor:pointer;width:100%; }
+  .range-note { font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);text-align:center;letter-spacing:1px; }
+  .gesture-group { width:100%;display:flex;flex-direction:column;gap:10px; }
+  .gesture-btn {
+    width:100%;background:transparent;border:1px solid var(--dim);color:var(--dim);
+    font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;
+    padding:10px 14px;border-radius:3px;cursor:pointer;text-transform:uppercase;
+    text-align:left;display:flex;align-items:center;justify-content:space-between;
+    transition:all 0.15s;position:relative;overflow:hidden;touch-action:manipulation;
+  }
+  .gesture-btn::before { content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(57,255,20,0.06));opacity:0;transition:opacity 0.2s; }
+  .gesture-btn:hover,.gesture-btn.flash { border-color:var(--accent3);color:var(--accent3);box-shadow:0 0 12px rgba(57,255,20,0.3); }
+  .gesture-btn:hover::before,.gesture-btn.flash::before { opacity:1; }
+  .gesture-btn.flash { background:rgba(57,255,20,0.06); }
+  .gesture-btn .g-key { font-size:9px;opacity:0.5;letter-spacing:1px; }
+  /* ── Stream Quality Controls ─────────────────────────────────────────────── */
+  .quality-bar {
+    width: 100%; max-width: 640px;
+    display: flex; align-items: center; gap: 16px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 16px;
+  }
+  .quality-label {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--dim); letter-spacing: 2px; text-transform: uppercase; flex-shrink: 0;
+  }
+  .res-btns { display: flex; gap: 6px; flex-shrink: 0; }
+  .res-btn {
+    background: transparent; border: 1px solid var(--dim); color: var(--dim);
+    font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 2px;
+    padding: 4px 10px; border-radius: 3px; cursor: pointer; transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .res-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .res-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.08); box-shadow: var(--glow); }
+  .quality-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+  .q-slider-wrap { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .q-slider-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--dim); letter-spacing: 1px; flex-shrink: 0; }
+  .q-slider-track { position: relative; flex: 1; height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; border: 1px solid var(--border); }
+  .q-slider-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent3), rgba(57,255,20,0.4)); }
+  .q-slider-thumb { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent3); background: rgba(57,255,20,0.2); transform: translate(-50%,-50%); box-shadow: 0 0 6px rgba(57,255,20,0.5); }
+  .q-range-input { position: absolute; inset: -6px 0; opacity: 0; cursor: pointer; width: 100%; }
+  .q-val { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--accent3); text-shadow: 0 0 6px rgba(57,255,20,0.5); min-width: 22px; text-align: right; flex-shrink: 0; }
+  .q-hint { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--dim); flex-shrink: 0; letter-spacing: 1px; }
+
+  .signal-history {
+    position:fixed;bottom:0;left:0;right:0;height:28px;
+    background:rgba(10,14,26,0.95);border-top:1px solid var(--border);
+    display:flex;align-items:center;padding:0 16px;gap:16px;overflow:hidden;
+  }
+  .signal-history .log-label { font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;flex-shrink:0; }
+  .signal-scroll { flex:1;overflow:hidden;position:relative; }
+  .signal-scroll-inner { display:flex;gap:24px;animation:scroll-log 20s linear infinite;white-space:nowrap; }
+  @keyframes scroll-log { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+  .log-item { font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent3);opacity:0.7; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">⬡ ESP32-CAM CTRL</div>
+  <div class="ip-config">
+    <label>CAM IP</label>
+    <input type="text" id="cam-ip" value="192.168.1.100" placeholder="192.168.x.x" />
+    <button class="connect-btn" onclick="connectStream()">CONNECT</button>
+    <span><span class="status-dot" id="status-dot"></span></span>
+  </div>
+  <div class="signal-log" id="signal-log">— AWAITING INPUT —</div>
+</div>
+
+<div class="main">
+
+  <div class="left-panel">
+    <div class="panel-title">◈ DIRECTIONAL CONTROL</div>
+    <div class="joystick-container">
+      <div class="joystick-ring">
+        <div class="joystick-crosshair"></div>
+        <div class="dpad">
+          <button class="dpad-btn up"    id="btn-w" onclick="sendCmd('FORWARD',  'btn-w')">▲<span class="btn-label">FWD [W]</span></button>
+          <button class="dpad-btn left"  id="btn-a" onclick="sendCmd('LEFT',     'btn-a')">◀<span class="btn-label">LEFT [A]</span></button>
+          <button class="dpad-btn right" id="btn-d" onclick="sendCmd('RIGHT',    'btn-d')">▶<span class="btn-label">RIGHT [D]</span></button>
+          <button class="dpad-btn down"  id="btn-s" onclick="sendCmd('BACKWARD', 'btn-s')">▼<span class="btn-label">BWD [S]</span></button>
+        </div>
+      </div>
+
+      <div class="active-signal-display" id="active-display">— IDLE —</div>
+
+      <!-- Cooldown bar shows ESP32 1-second throttle window visually -->
+      <div class="cooldown-bar"><div class="cooldown-fill" id="cooldown-fill"></div></div>
+      <div class="cooldown-label" id="cooldown-label">READY</div>
+
+      <div class="dpad-key-hints">
+        <div class="key-hint"><span>W</span>FWD</div>
+        <div class="key-hint"><span>S</span>BWD</div>
+        <div class="key-hint"><span>A</span>LEFT</div>
+        <div class="key-hint"><span>D</span>RIGHT</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="level-bar">
+    <span class="level-label">SENSITIVITY</span>
+    <button class="level-btn" id="lvl1" onclick="sendCmd('LEVEL1','lvl1')">LEVEL 1 <small style="opacity:0.5;font-size:9px;">[1]</small></button>
+    <button class="level-btn" id="lvl2" onclick="sendCmd('LEVEL2','lvl2')">LEVEL 2 <small style="opacity:0.5;font-size:9px;">[2]</small></button>
+    <button class="level-btn" id="lvl3" onclick="sendCmd('LEVEL3','lvl3')">LEVEL 3 <small style="opacity:0.5;font-size:9px;">[3]</small></button>
+  </div>
+
+  <div class="center-panel">
+    <div class="stream-wrapper">
+      <div class="corner-tl"></div><div class="corner-tr"></div>
+      <div class="corner-bl"></div><div class="corner-br"></div>
+      <div class="no-stream" id="no-stream">
+        <div class="scan-line"></div>
+        <p>NO SIGNAL</p>
+        <p style="font-size:9px;margin-top:4px;">Enter IP and press CONNECT</p>
+      </div>
+      <img id="stream-img" src="" alt="stream" style="display:none;"
+        onerror="streamError()" onload="streamLoaded()" />
+    </div>
+
+    <!-- Stream Quality Controls -->
+    <div class="quality-bar">
+      <span class="quality-label">RESOLUTION</span>
+      <div class="res-btns">
+        <button class="res-btn" id="res-qqvga" onclick="setResolution(1,'res-qqvga')">QQVGA<small style="opacity:0.5;display:block;font-size:7px;">160×120</small></button>
+        <button class="res-btn active" id="res-qvga"  onclick="setResolution(5,'res-qvga')">QVGA<small style="opacity:0.5;display:block;font-size:7px;">320×240</small></button>
+        <button class="res-btn" id="res-vga"   onclick="setResolution(8,'res-vga')">VGA<small style="opacity:0.5;display:block;font-size:7px;">640×480</small></button>
+      </div>
+      <div class="quality-divider"></div>
+      <span class="quality-label">JPEG Q</span>
+      <div class="q-slider-wrap">
+        <span class="q-hint">CRISP</span>
+        <div class="q-slider-track">
+          <div class="q-slider-fill" id="q-fill" style="width:37%"></div>
+          <div class="q-slider-thumb" id="q-thumb" style="left:37%"></div>
+          <input type="range" class="q-range-input" id="q-slider" min="10" max="63" value="30"
+            oninput="setQuality(this.value)" />
+        </div>
+        <span class="q-hint">SMALL</span>
+        <span class="q-val" id="q-val">30</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="panel-title">◈ AXIS CONTROL</div>
+
+    <div class="gesture-group">
+      <div class="panel-title" style="margin-bottom:4px;">◈ GESTURES</div>
+      <button class="gesture-btn" id="btn-gesture-i" onclick="sendCmd('GESTURE_I','btn-gesture-i')">
+        <span>✦ HAND SHAKE</span><span class="g-key">[I]</span>
+      </button>
+      <button class="gesture-btn" id="btn-gesture-o" onclick="sendCmd('GESTURE_O','btn-gesture-o')">
+        <span>〜 HAND WAVE</span><span class="g-key">[O]</span>
+      </button>
+    </div>
+
+    <div style="width:100%;height:1px;background:var(--border);"></div>
+
+    <div class="slider-group">
+      <div class="slider-label">
+        <span class="axis-name x">X — AXIS</span>
+        <span class="slider-value x" id="x-val">50</span>
+      </div>
+      <div class="slider-track">
+        <div class="slider-fill x" id="x-fill" style="width:50%"></div>
+        <div class="slider-thumb x" id="x-thumb" style="left:50%"></div>
+        <input type="range" class="range-input" id="x-slider" min="0" max="100" value="50"
+          oninput="updateSlider('x', this.value)" />
+      </div>
+      <div class="slider-keys"><span>← LEFT (0)</span><span>(100) RIGHT →</span></div>
+      <div class="range-note">SIGNAL RANGE: 0 – 100</div>
+    </div>
+
+    <div style="width:100%;height:1px;background:var(--border);"></div>
+
+    <div class="slider-group">
+      <div class="slider-label">
+        <span class="axis-name y">Y — AXIS</span>
+        <span class="slider-value y" id="y-val">150</span>
+      </div>
+      <div class="slider-track">
+        <div class="slider-fill y" id="y-fill" style="width:50%"></div>
+        <div class="slider-thumb y" id="y-thumb" style="left:50%"></div>
+        <input type="range" class="range-input" id="y-slider" min="101" max="200" value="150"
+          oninput="updateSlider('y', this.value)" />
+      </div>
+      <div class="slider-keys"><span>PgDn (101)</span><span>(200) PgUp</span></div>
+      <div class="range-note">SIGNAL RANGE: 101 – 200</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="signal-history">
+  <span class="log-label">SIGNAL LOG</span>
+  <div class="signal-scroll">
+    <div class="signal-scroll-inner" id="signal-scroll-inner">
+      <span class="log-item">SYSTEM READY</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD THROTTLE
+// This matches the ESP32's CMD_MIN_INTERVAL_MS = 1000ms.
+// The dashboard rate-limits its own sends so it never spams the ESP.
+// There is NO busy-lock — every click sends immediately if 1 second
+// has passed since the last send. The ESP32 handles any extras with
+// its own throttle and replies "THROTTLED" which we just ignore.
+// ─────────────────────────────────────────────────────────────────────────────
+const THROTTLE_MS     = 1050;  // slightly over ESP32's 1000ms to stay in sync
+const SLIDER_MS       = 250;   // slider throttle — 4 sends/sec max
+
+let camIP             = '';
+let lastSentAt        = 0;     // timestamp of last command sent
+let cooldownAnimFrame = null;
+let signalHistory     = ['SYSTEM READY'];
+
+// Slider state
+let sliderTimers      = { x: null, y: null };
+let sliderPending     = { x: null, y: null };
+
+// ── Stream ───────────────────────────────────────────────────────────────────
+// Default to QVGA (framesize=5) + quality=30 to keep ESP32-CAM cool
+let currentFramesize = 5;   // QVGA 320×240
+let currentQuality   = 30;  // JPEG quality (10=best/heavy, 63=worst/lightest)
+
+function connectStream() {
+  camIP = document.getElementById('cam-ip').value.trim();
+  if (!camIP) return;
+  const img = document.getElementById('stream-img');
+  img.src = `http://${camIP}:81/stream`;
+  img.style.display = 'block';
+  document.getElementById('no-stream').style.display = 'none';
+  log('CONNECTING → ' + camIP);
+  // Apply quality settings after a short delay (give stream a moment to init)
+  setTimeout(() => applyStreamQuality(), 1200);
+}
+
+// Send resolution + quality to ESP32-CAM /control endpoint
+function applyStreamQuality() {
+  if (!camIP) return;
+  fetch(`http://${camIP}/control?var=framesize&val=${currentFramesize}`, { keepalive: false, signal: AbortSignal.timeout(2000) }).catch(() => {});
+  setTimeout(() => {
+    fetch(`http://${camIP}/control?var=quality&val=${currentQuality}`, { keepalive: false, signal: AbortSignal.timeout(2000) }).catch(() => {});
+  }, 300);
+  log(`CAM QUALITY → fs=${currentFramesize} q=${currentQuality}`);
+}
+
+function setResolution(fsVal, btnId) {
+  currentFramesize = fsVal;
+  ['res-qqvga','res-qvga','res-vga'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById(btnId).classList.add('active');
+  if (camIP) {
+    fetch(`http://${camIP}/control?var=framesize&val=${fsVal}`, { keepalive: false, signal: AbortSignal.timeout(2000) }).catch(() => {});
+    log('FRAMESIZE → ' + fsVal);
+  }
+}
+
+function setQuality(rawVal) {
+  currentQuality = parseInt(rawVal);
+  const pct = ((currentQuality - 10) / 53) * 100;
+  document.getElementById('q-fill').style.width  = pct + '%';
+  document.getElementById('q-thumb').style.left  = pct + '%';
+  document.getElementById('q-val').textContent   = currentQuality;
+  if (!qTimer) {
+    qTimer = setTimeout(() => {
+      qTimer = null;
+      if (camIP) {
+        fetch(`http://${camIP}/control?var=quality&val=${currentQuality}`, { keepalive: false, signal: AbortSignal.timeout(2000) }).catch(() => {});
+        log('JPEG QUALITY → ' + currentQuality);
+      }
+    }, 400);
+  }
+}
+let qTimer = null;
+function streamLoaded() {
+  document.getElementById('status-dot').classList.add('connected');
+  log('STREAM ACTIVE');
+}
+function streamError() {
+  document.getElementById('stream-img').style.display = 'none';
+  document.getElementById('no-stream').style.display = 'flex';
+  document.getElementById('status-dot').classList.remove('connected');
+  log('STREAM ERROR');
+}
+
+// ── Core fetch — fire and forget, no busy lock ────────────────────────────────
+function doFetch(val) {
+  if (!camIP) return;
+  // keepalive:false → browser closes TCP immediately, frees ESP32 socket slot
+  fetch(`http://${camIP}/cmd?val=${encodeURIComponent(val)}`, {
+    keepalive: false,
+    signal: AbortSignal.timeout(2000)
+  }).catch(() => {});
+}
+
+// ── Throttled command sender ──────────────────────────────────────────────────
+// Every command goes through here. If within the 1-second window,
+// it is DROPPED on the dashboard side before even making an HTTP request.
+// This prevents the ESP32 from ever receiving flood requests.
+function sendCmd(val, btnId) {
+  const now = Date.now();
+  const elapsed = now - lastSentAt;
+
+  if (elapsed < THROTTLE_MS) {
+    // Too soon — show visual feedback that it was rate-limited
+    showRateLimited();
+    return;
+  }
+
+  // Good to send
+  lastSentAt = now;
+  doFetch(val);
+  log('→ ' + val);
+
+  // Flash button
+  if (btnId) {
+    const el = document.getElementById(btnId);
+    if (el) {
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 200);
+    }
+  }
+
+  // Level button highlight
+  if (val.startsWith('LEVEL')) {
+    ['lvl1','lvl2','lvl3'].forEach(id => document.getElementById(id).classList.remove('active'));
+    const n = val.slice(-1);
+    document.getElementById('lvl' + n).classList.add('active');
+  }
+
+  // Show active display
+  setActiveDisplay('▶ ' + val, true);
+  setTimeout(() => setActiveDisplay('— IDLE —', false), 600);
+
+  // Start cooldown bar animation
+  startCooldown();
+}
+
+// ── Cooldown bar (visual only — shows the 1-second lock window) ───────────────
+function startCooldown() {
+  if (cooldownAnimFrame) cancelAnimationFrame(cooldownAnimFrame);
+  const fill  = document.getElementById('cooldown-fill');
+  const label = document.getElementById('cooldown-label');
+  const start = Date.now();
+
+  function tick() {
+    const elapsed = Date.now() - start;
+    const pct = Math.min(100, (elapsed / THROTTLE_MS) * 100);
+    fill.style.width = pct + '%';
+
+    if (pct < 100) {
+      const remaining = ((THROTTLE_MS - elapsed) / 1000).toFixed(1);
+      label.textContent = remaining + 's';
+      cooldownAnimFrame = requestAnimationFrame(tick);
+    } else {
+      fill.style.width = '0%';
+      label.textContent = 'READY';
+      cooldownAnimFrame = null;
+    }
+  }
+  cooldownAnimFrame = requestAnimationFrame(tick);
+}
+
+function showRateLimited() {
+  // Flash the cooldown bar red briefly to show the click was too fast
+  const fill = document.getElementById('cooldown-fill');
+  fill.style.background = 'var(--accent2)';
+  setTimeout(() => { fill.style.background = 'var(--accent)'; }, 200);
+  log('THROTTLED (too fast)');
+}
+
+// ── Sliders — throttled separately, do NOT share the 1-second cmd throttle ───
+// Sliders bypass the main THROTTLE_MS window because they control servos
+// independently — they should always get through.
+function updateSlider(axis, rawVal) {
+  const val = parseInt(rawVal);
+
+  // Update UI immediately
+  if (axis === 'x') {
+    document.getElementById('x-val').textContent = val;
+    const pct = (val / 100) * 100;
+    document.getElementById('x-fill').style.width = pct + '%';
+    document.getElementById('x-thumb').style.left = pct + '%';
+  } else {
+    document.getElementById('y-val').textContent = val;
+    const pct = ((val - 101) / 99) * 100;
+    document.getElementById('y-fill').style.width = pct + '%';
+    document.getElementById('y-thumb').style.left = pct + '%';
+  }
+
+  // Throttle the actual send
+  sliderPending[axis] = val;
+  if (!sliderTimers[axis]) {
+    // Send immediately on first event
+    doFetch(val);
+    log((axis.toUpperCase()) + '-AXIS: ' + val);
+    sliderTimers[axis] = setTimeout(() => {
+      sliderTimers[axis] = null;
+      if (sliderPending[axis] !== null) {
+        doFetch(sliderPending[axis]);
+        log((axis.toUpperCase()) + '-AXIS: ' + sliderPending[axis]);
+        sliderPending[axis] = null;
+      }
+    }, SLIDER_MS);
+  }
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setActiveDisplay(text, fire) {
+  const el = document.getElementById('active-display');
+  el.textContent = text;
+  el.className = 'active-signal-display' + (fire ? ' firing' : '');
+}
+
+function log(msg) {
+  const ts = new Date().toLocaleTimeString('en-GB', {hour12: false});
+  const entry = `[${ts}] ${msg}`;
+  signalHistory.push(entry);
+  if (signalHistory.length > 20) signalHistory.shift();
+  document.getElementById('signal-log').textContent = entry;
+  document.getElementById('signal-scroll-inner').innerHTML =
+    signalHistory.map(s => `<span class="log-item">${s}</span>`).join('');
+}
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+// e.repeat guard is CRITICAL — without it, holding a key sends
+// 20-30 requests/second which floods the ESP32.
+const heldKeys = new Set();
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;           // ← ignore browser key-repeat
+  if (heldKeys.has(e.key)) return;
+  heldKeys.add(e.key);
+
+  switch (e.key) {
+    case 'w': case 'W': sendCmd('FORWARD',   'btn-w'); break;
+    case 's': case 'S': sendCmd('BACKWARD',  'btn-s'); break;
+    case 'a': case 'A': sendCmd('LEFT',      'btn-a'); break;
+    case 'd': case 'D': sendCmd('RIGHT',     'btn-d'); break;
+    case '1':           sendCmd('LEVEL1',    'lvl1');  break;
+    case '2':           sendCmd('LEVEL2',    'lvl2');  break;
+    case '3':           sendCmd('LEVEL3',    'lvl3');  break;
+    case 'i': case 'I': sendCmd('GESTURE_I', 'btn-gesture-i'); break;
+    case 'o': case 'O': sendCmd('GESTURE_O', 'btn-gesture-o'); break;
+    case 'ArrowRight': {
+      e.preventDefault();
+      const sl = document.getElementById('x-slider');
+      sl.value = Math.min(100, parseInt(sl.value) + 5);
+      updateSlider('x', sl.value); break;
+    }
+    case 'ArrowLeft': {
+      e.preventDefault();
+      const sl = document.getElementById('x-slider');
+      sl.value = Math.max(0, parseInt(sl.value) - 5);
+      updateSlider('x', sl.value); break;
+    }
+    case 'PageUp': {
+      e.preventDefault();
+      const sl = document.getElementById('y-slider');
+      sl.value = Math.min(200, parseInt(sl.value) + 5);
+      updateSlider('y', sl.value); break;
+    }
+    case 'PageDown': {
+      e.preventDefault();
+      const sl = document.getElementById('y-slider');
+      sl.value = Math.max(101, parseInt(sl.value) - 5);
+      updateSlider('y', sl.value); break;
+    }
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  heldKeys.delete(e.key);
+});
+</script>
+</body>
+</html>
