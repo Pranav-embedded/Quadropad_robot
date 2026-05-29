@@ -1,4 +1,4 @@
-# ESP32-CAM Servo Robot
+# Disaster Exploration Quadruped (ESP32-cam, Arduino nano, 12 servo)
 
 A WiFi-controlled walking robot with live video streaming, built around an ESP32-CAM and Arduino Nano driving 12 servo motors — powered entirely from a 3S Li-ion battery pack.
 
