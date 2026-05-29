@@ -18,10 +18,10 @@ This project implements a **12-servo quadruped robot** using an **Arduino Nano**
 
 | Command | Action        |
 |---------|---------------|
-| `F`     | Step Forward  |
-| `B`     | Step Backward |
-| `L`     | Turn Left     |
-| `R`     | Turn Right    |
+| `W`     | Step Forward  |
+| `S`     | Step Backward |
+| `A`     | Turn Left     |
+| `D`     | Turn Right    |
 | `U`     | Hand Shake    |
 | `W`     | Hand Wave     |
 | `V`     | Body Dance    |
@@ -43,7 +43,7 @@ This project implements a **12-servo quadruped robot** using an **Arduino Nano**
 
 - `setup()`: Initializes servos, sets default positions, and starts the servo service.
 - `loop()`: Reads Bluetooth serial input and triggers appropriate movement functions.
-- `motion functions`: `step_forward()`, `turn_left()`, `sit()`, `stand()`, `body_dance()` etc.
+- `motion functions`: `step_forward()`, `turn_left()`, `sit()`, `stand()` etc.
 - `servo_service()`: Timer-based ISR that updates each servo position using inverse kinematics.
 
 ---
@@ -53,7 +53,7 @@ This project implements a **12-servo quadruped robot** using an **Arduino Nano**
 1. Upload the code to your Arduino using the Arduino IDE.
 2. Power the servo motors using a separate power supply.
 3. Pair your mobile device with the HC-05 module.
-4. Use a Bluetooth terminal app to send commands (`F`, `B`, etc.).
+4. Use a Bluetooth terminal app to send commands (`W`, `S`, etc.).
 5. Watch your quadruped robot come to life!
 
 
